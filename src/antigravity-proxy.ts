@@ -10,7 +10,7 @@ export function antigravityRequest(model: string, body: string, headers: Headers
   const value: unknown = JSON.parse(body);
   if (!isObject(value)) throw new Error("Antigravity request must be a JSON object");
   const request: Json = { ...value };
-  request.sessionId ??= crypto.randomUUID();
+  request.sessionId ??= `-${(crypto.getRandomValues(new BigUint64Array(1))[0] ?? 0n) & ((1n << 63n) - 1n)}`;
   headers.delete("x-antigravity-project");
   headers.delete("x-goog-api-key");
   headers.set("user-agent", USER_AGENT);

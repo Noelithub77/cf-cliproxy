@@ -1,29 +1,13 @@
 # Security
 
-## Reporting a vulnerability
+Report fork-specific issues privately to [Noelithub77/cf-cliproxy](https://github.com/Noelithub77/cf-cliproxy/security). CLIProxyAPI protocol issues belong in [router-for-me/CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI); inherited gateway issues may also affect [PlaygrndLabs/sub2api](https://github.com/PlaygrndLabs/sub2api).
 
-Please report privately through [GitHub's private vulnerability reporting](https://github.com/PlaygrndLabs/sub2api/security/advisories/new). Don't open a public issue. We aim to reply within a week.
+The Worker serves public static management HTML. Every management API request requires the separate `MANAGEMENT_KEY` secret, compared with Web Crypto. Inference requires an entry in `access.api-keys`; an empty list denies access. Client API credentials and cookies are never forwarded as upstream credentials. The official manager runs on this origin, so only serve a trusted, pinned release.
 
-Bugs in CPA itself belong upstream at [router-for-me/CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI).
+Configuration, provider auth files, refreshed tokens, cooldowns and bounded usage records live in one SQLite Durable Object. Keep the Cloudflare account, Worker and Durable Object namespace private. No container, R2 bucket or shared third-party database is involved. Ordinary deployments preserve state; deletion of the namespace does not.
 
-## Security model
+Antigravity token requests use the fixed Google OAuth endpoint and a privately supplied desktop OAuth client secret. Google error bodies from token exchanges are not exposed. The account keeps one pending refresh per auth file, so simultaneous requests share that refresh. The OAuth state expires after 15 minutes; a completed session cannot be replayed. Gemini upstream hosts are fixed by the adapter rather than taken from an imported auth file.
 
-Everything a deploy holds belongs to its owner: your Cloudflare account, your R2 bucket and your secrets. This repository has no keys, telemetry or shared backend.
+Keep setup JSON and provider files outside the checkout with owner-only permissions. Never commit `.dev.vars`, keys, tokens, provider auth files or configuration exports. Operator input arrives on stdin; output contains only hashes, counts and model names. Rotate exposed credentials through the same configuration path, and update all endpoints that deliberately share a key.
 
-- **API calls need a key.** On its own, CPA lets every `/v1/*` and `/v1beta/*` call through while its key list is empty. The gateway closes that gap: before forwarding, it asks CPA with a random key (`src/key-guard.ts`). If CPA accepts it, no keys are set up, so the gateway refuses the call. If CPA can't be reached, the gateway refuses too. The check runs in the single Durable Object in front of the container, so every request sees the same answer, and a dashboard change takes effect at once.
-- **The dashboard needs two secrets.** First the `DASHBOARD_PASSWORD` sign-in, which sets an HMAC-signed `__Host-` cookie (HttpOnly, Secure, SameSite=Strict) that lasts 12 hours. Then CPA's own management key. Sign-in attempts are limited to 5 a minute per IP. Changing the password signs out every session.
-- **Only known paths reach CPA.** The API, the dashboard, `/healthz` and the OAuth callback (for a signed-in user only) are forwarded. Everything else, and any path with encoded separators, returns 404. Browser cookies are stripped before forwarding.
-- **State stays in your R2 bucket.** CPA's S3 client talks to `http://r2.internal`, which only the container can reach and which the Worker serves from an R2 binding. No R2 API tokens exist.
-- **An upstream you trust.** By default the container builds the newest CPA release tag, and both installs download the newest dashboard release, so a new upstream release reaches your gateway on its next deploy, including the weekly one. The dashboard runs on your gateway's origin and holds your management key, so a compromised upstream release would control your gateway. To freeze them, set `CPA_VERSION`, `PANEL_VERSION` and `PANEL_SHA256` in `container/Dockerfile` (Container install), or the `PANEL_VERSION` and `PANEL_SHA256` repository variables (Workers-only install, `.github/workflows/deploy-worker.yml`). The build fails when the dashboard doesn't match its checksum. Each build prints the CPA tag and the dashboard's SHA-256.
-
-### The Workers-only install (`worker/`)
-
-- **API calls need a key from `access.api-keys`.** The key check and the Claude token are cached per Worker isolate for at most a minute, so a key or login you remove stops working everywhere within a minute.
-- **The dashboard and management API need two secrets,** as above: the `DASHBOARD_PASSWORD` sign-in cookie and the management key (`MANAGEMENT_KEY`). Both installs require a separate `MANAGEMENT_KEY`, because the dashboard can remember the key it is given in browser storage; the Workers-only install keeps its management API off until the key is set and differs from the password. Sign-in attempts are limited to 5 a minute per IP, and the dashboard page is never framed.
-- **Only Anthropic is called.** The three proxied paths go to `api.anthropic.com` with an allowlist of request headers; the client's key and cookies are never forwarded. OAuth uses PKCE (S256), and refresh tokens stay in the Durable Object's storage.
-
-## Your part
-
-- Use long random secrets: `openssl rand -hex 32`.
-- Give each app its own API key, and delete a key the moment it may have leaked.
-- Never commit `.dev.vars`. It is in `.gitignore`.
+A gateway key grants inference access, not management access. The management key can export provider credentials; treat it accordingly. Usage logs omit request bodies and keys. Free-tier limits can reject large translated payloads, and this endpoint does not guarantee provider capacity or availability.

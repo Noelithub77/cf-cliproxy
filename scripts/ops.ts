@@ -11,7 +11,7 @@ const apply = flags.includes("--apply");
 const allowed = new Set(["--prod", "--apply"]);
 if (flags.some((flag) => !allowed.has(flag))) throw new Error("Unknown flag; use pnpm ops help");
 if (command !== "help" && !flags.includes("--prod")) throw new Error("Select the production endpoint with --prod");
-if (apply && !["deploy", "secrets", "configure"].includes(command)) throw new Error("This command is read-only");
+if (apply && !["deploy", "secrets", "configure", "refresh"].includes(command)) throw new Error("This command is read-only");
 
 function record(value: unknown): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) throw new Error("Expected a JSON object");
@@ -47,7 +47,7 @@ async function api(path: string, init: RequestInit = {}): Promise<Response> {
   return response;
 }
 async function main(): Promise<unknown> {
-  if (command === "help") return { commands: ["doctor --prod", "deploy --prod [--apply]", "secrets --prod [--apply] < protected-input.json", "configure --prod [--apply] < protected-input.json", "status --prod < protected-input.json", "probe --prod < protected-input.json"], target: ORIGIN, note: "secrets/configure inputs are JSON on stdin only; previews never mutate. No plan upgrades or container resources." };
+  if (command === "help") return { commands: ["doctor --prod", "deploy --prod [--apply]", "secrets --prod [--apply] < protected-input.json", "configure --prod [--apply] < protected-input.json", "status --prod < protected-input.json", "refresh --prod [--apply] < protected-input.json", "probe --prod < protected-input.json"], target: ORIGIN, note: "secrets/configure inputs are JSON on stdin only; previews never mutate. No plan upgrades or container resources." };
   if (command === "doctor") {
     const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}/workers/scripts`, { headers: { authorization: `Bearer ${auth()}` } });
     if (!response.ok) throw new Error(`Cloudflare authentication failed (HTTP ${response.status})`);
@@ -86,6 +86,12 @@ async function main(): Promise<unknown> {
       }
     }
     return { applied: apply, apiKeyHash: hash(key), managementKeyHash: hash(management), importedFiles: names.length };
+  }
+  if (command === "refresh") {
+    if (!apply) return { applied: false, action: "refresh configured provider credentials" };
+    const response = await api("/v8/management/credentials/refresh", { method: "POST", headers: { authorization: `Bearer ${management}` } });
+    const value: unknown = await response.json();
+    return { applied: true, refreshed: record(value).refreshed };
   }
   if (command === "status") {
     const publicModels = await fetch(ORIGIN + "/v1/models");

@@ -6,7 +6,7 @@ import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 
 const version = process.env.PANEL_VERSION || "v1.27.0";
-const expected = (process.env.PANEL_SHA256 ?? "").trim().toLowerCase();
+const expected = (process.env.PANEL_SHA256 ?? (version === "v1.27.0" ? "2ca7a226f8d2fa078fb52e12fd5b75762ded2dc585205d3da509ebfb17ea2adf" : "")).trim().toLowerCase();
 const base = "https://github.com/router-for-me/Cli-Proxy-API-Management-Center/releases";
 const url = version === "latest" ? `${base}/latest/download/management.html` : `${base}/download/${version}/management.html`;
 
