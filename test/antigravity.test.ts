@@ -86,16 +86,17 @@ describe("Antigravity request boundary", () => {
       expect(upstream.headers.get("authorization")).toBe(`Bearer ${LOGIN.accessToken}`);
       expect(upstream.headers.get("cookie")).toBeNull();
       expect(upstream.redirect).toBe("manual");
-      return Response.json({ groups: [{ name: "Gemini", remainingFraction: 0.75 }] }, { headers: { date: "Sun, 01 Nov 2026 12:00:00 GMT" } });
+      return Response.json({ groups: [{ displayName: "Gemini", buckets: [{ remainingFraction: 0.75 }] }] }, { headers: { date: "Sun, 01 Nov 2026 12:00:00 GMT" } });
     });
     vault.saveCredentialFile("antigravity-fixture.json", "antigravity", fileData(LOGIN), NOW);
     const send = (url: string) => request("/v8/management/requests/api-call", { method: "POST", headers: { authorization: `Bearer ${MANAGEMENT}`, "content-type": "application/json" }, body: JSON.stringify({ authIndex: "antigravity-fixture.json", method: "POST", url, header: { Authorization: "Bearer $TOKEN$" }, data: JSON.stringify({ project: LOGIN.projectId }) }) });
     const response = await send(`${API_BASE}/v1internal:retrieveUserQuotaSummary`);
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ status_code: 200, header: { date: ["Sun, 01 Nov 2026 12:00:00 GMT"] }, body: JSON.stringify({ groups: [{ name: "Gemini", remainingFraction: 0.75 }] }) });
+    expect(await response.json()).toMatchObject({ status_code: 200, header: { date: ["Sun, 01 Nov 2026 12:00:00 GMT"] }, body: JSON.stringify({ groups: [{ displayName: "Gemini", buckets: [{ remainingFraction: 0.75 }] }] }) });
     expect((await send("https://attacker.example/v1internal:retrieveUserQuotaSummary")).status).toBe(400);
     expect((await send(`${API_BASE}/other-path`)).status).toBe(400);
-    expect(calls).toBe(1);
+    expect((await send(`${API_BASE}/v1internal:loadCodeAssist`)).status).toBe(200);
+    expect(calls).toBe(2);
     expect((await request("/v8/management/requests/api-call", { method: "POST", body: "{}" })).status).toBe(401);
   });
   it("preserves images and strict JSON schema through OpenAI translation", async () => {

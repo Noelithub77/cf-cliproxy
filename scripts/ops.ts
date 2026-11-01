@@ -119,7 +119,21 @@ async function main(): Promise<unknown> {
       const raw: unknown = JSON.parse(text(response.body));
       const groups = record(raw).groups;
       if (!Array.isArray(groups) || !groups.length) throw new Error("Google quota response has no groups");
-      accounts.push({ provider: "antigravity", http: response.status_code, quotaGroups: groups.length });
+      const quotaBuckets = groups.flatMap((group: unknown) => {
+        const buckets = record(group).buckets;
+        return Array.isArray(buckets) ? buckets : [];
+      }).filter((bucket: unknown) => {
+        const fraction = record(bucket).remainingFraction ?? record(bucket).remaining_fraction;
+        return typeof fraction === "number" && Number.isFinite(fraction) && fraction >= 0 && fraction <= 1;
+      }).length;
+      if (!quotaBuckets) throw new Error("Google quota response has no usable buckets");
+      const subscription: unknown = await (await api("/v8/management/requests/api-call", { method: "POST", headers, body: JSON.stringify({ ...payload, url: "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist", data: JSON.stringify({ metadata: { ideType: "ANTIGRAVITY" } }) }) })).json();
+      const subscriptionResult = record(subscription);
+      if (subscriptionResult.status_code !== 200) throw new Error(`Google subscription returned HTTP ${String(subscriptionResult.status_code)}`);
+      const subscriptionBody = record(JSON.parse(text(subscriptionResult.body)) as unknown);
+      const tier = subscriptionBody.paidTier ?? subscriptionBody.currentTier;
+      if (typeof tier !== "object" || tier === null) throw new Error("Google subscription returned no tier");
+      accounts.push({ provider: "antigravity", http: response.status_code, quotaGroups: groups.length, quotaBuckets, subscriptionHttp: subscriptionResult.status_code, subscriptionTierAvailable: true });
     }
     if (!accounts.length) throw new Error("No Antigravity account is configured");
     return { accounts };
