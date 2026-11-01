@@ -17,8 +17,9 @@
     "http": 200
   },
   "workerBundle": {
-    "gzipKiB": 212.35,
-    "startupMilliseconds": 6
+    "gzipKiB": 212.38,
+    "startupMilliseconds": 6,
+    "uncompressedKiB": 1018.53
   },
   "tests": {
     "passed": 196,
