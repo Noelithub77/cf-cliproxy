@@ -35,6 +35,8 @@ pnpm ops secrets --prod --apply < /private/setup.json
 pnpm ops configure --prod < /private/setup.json
 pnpm ops configure --prod --apply < /private/setup.json
 pnpm ops status --prod < /private/setup.json
+pnpm ops refresh --prod < /private/setup.json
+pnpm ops refresh --prod --apply < /private/setup.json
 pnpm ops probe --prod < /private/setup.json
 ```
 

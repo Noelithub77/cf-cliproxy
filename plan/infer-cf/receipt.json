@@ -1,0 +1,68 @@
+{
+  "verifiedAt": "2026-11-01T12:47:10Z",
+  "endpoint": "https://infer-cf.allpyq.in",
+  "repository": "https://github.com/Noelithub77/cf-cliproxy",
+  "codeRevision": "75a8e87",
+  "workerVersion": "e37b7f82-41e9-4a54-93ce-9cc141a3da15",
+  "runtime": "Workers Free, SQLite Durable Object, static manager asset; no container or R2",
+  "apiKeySharedWith": [
+    "infer.allpyq.in",
+    "infer-local.allpyq.in"
+  ],
+  "managementKeyShared": true,
+  "officialManager": {
+    "release": "v1.27.0",
+    "sha256": "2ca7a226f8d2fa078fb52e12fd5b75762ded2dc585205d3da509ebfb17ea2adf",
+    "servedBytes": 3702882,
+    "http": 200
+  },
+  "workerBundle": {
+    "gzipKiB": 212.35,
+    "startupMilliseconds": 6
+  },
+  "tests": {
+    "passed": 196,
+    "files": 17,
+    "typecheck": true,
+    "lint": true
+  },
+  "providerRefresh": {
+    "applied": true,
+    "refreshed": 2
+  },
+  "persistedAfterRedeploy": {
+    "publicModelsStatus": 401,
+    "models": [
+      "gemini-3.5-flash-lite",
+      "gemini-3.8-flash-high"
+    ],
+    "managementStatus": 200,
+    "configuredApiKeys": 1,
+    "apiKeyHash": "c826785bd877",
+    "managementKeyHash": "88ddf056b102"
+  },
+  "liveProtocol": {
+    "at": "2026-11-01T12:47:10.353Z",
+    "nonstream": {
+      "structuredVision": true,
+      "endpoint": "https://infer-cf.allpyq.in/v1",
+      "finishReason": "stop",
+      "model": "gemini-3.5-flash-lite"
+    },
+    "stream": {
+      "http": 200,
+      "contentType": "text/event-stream; charset=utf-8",
+      "expectedTextVerified": true,
+      "doneMarkerVerified": true
+    }
+  },
+  "productionRoutingUnchanged": {
+    "primary": "https://infer.allpyq.in/v1",
+    "backup": "https://infer-local.allpyq.in/v1"
+  },
+  "limits": [
+    "10 ms CPU budget and free-tier quotas apply; large PDF payloads not load tested",
+    "Antigravity Gemini adapter only; Claude signature replay not ported",
+    "Asset integrity and management API verified; browser management interaction not run"
+  ]
+}
