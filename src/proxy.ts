@@ -1,3 +1,4 @@
+import { antigravityRequest } from "./antigravity-proxy.ts";
 import { DEFAULT_BASE_URL, type Format, type UpstreamCredential } from "./providers.ts";
 
 export const UPSTREAM = "https://api.anthropic.com";
@@ -150,6 +151,10 @@ export function providerRequest(request: Request, url: URL, route: Route, creden
       if (credential.apiKey !== "") headers.set("x-goog-api-key", credential.apiKey);
       target = `${vertexModels(credential.baseUrl)}/${encodeURIComponent(model)}:${route.geminiAction ?? "generateContent"}${forwardedSearch(url)}`;
       break;
+    case "antigravity":
+      applyConfiguredHeaders(headers, credential, request);
+      if (typeof body !== "string") throw new Error("Antigravity requires a JSON request body");
+      return antigravityRequest(model, body, headers, route.geminiAction ?? "generateContent");
     case "kimi": {
       // The login's token and Kimi's identity headers come as configured headers.
       if (route.format === "claude" && !headers.has("anthropic-version")) headers.set("anthropic-version", "2023-06-01");

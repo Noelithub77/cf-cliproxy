@@ -145,6 +145,7 @@ export function claudeToGemini(claude: Json, model: string): GeminiRequest {
   if (typeof claude.top_p === "number") generation.topP = claude.top_p;
   if (typeof claude.top_k === "number") generation.topK = claude.top_k;
   if (Array.isArray(claude.stop_sequences) && claude.stop_sequences.length > 0) generation.stopSequences = claude.stop_sequences;
+  if (isObject(claude.gateway_json_format)) Object.assign(generation, claude.gateway_json_format);
   if (Object.keys(generation).length > 0) body.generationConfig = generation;
   return { body, stream: claude.stream === true, toolNames };
 }

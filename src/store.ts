@@ -16,7 +16,7 @@ export class Store extends DurableObject<Env> implements Backend {
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
-    this.account = new Account(new Vault(ctx.storage.sql), (request) => fetch(request), nowSeconds);
+    this.account = new Account(new Vault(ctx.storage.sql), (request) => fetch(request), nowSeconds, { clientSecret: env.ANTIGRAVITY_CLIENT_SECRET ?? "" });
   }
 
   keyValid(hash: string): Promise<boolean> {

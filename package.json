@@ -1,43 +1,17 @@
 {
-  "name": "sub2api",
-  "description": "A Cloudflare-based LLM gateway and proxy server: the CLIProxyAPI (CPA) project deployed as a Cloudflare Worker in one click.",
+  "name": "cf-cliproxy",
+  "description": "cliproxy running full time free on cf",
   "license": "MIT",
-  "homepage": "https://github.com/PlaygrndLabs/sub2api#readme",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/PlaygrndLabs/sub2api.git"
-  },
-  "bugs": {
-    "url": "https://github.com/PlaygrndLabs/sub2api/issues"
-  },
-  "keywords": [
-    "cliproxyapi",
-    "cpa",
-    "cloudflare-workers",
-    "cloudflare-containers",
-    "claude-code",
-    "llm-gateway",
-    "llm-proxy",
-    "ai-gateway",
-    "openai-compatible",
-    "anthropic",
-    "codex",
-    "gemini",
-    "self-hosted"
-  ],
   "private": true,
   "type": "module",
   "scripts": {
+    "ops": "node scripts/ops.ts",
     "types": "wrangler types --include-env=false",
     "typecheck": "tsc && tsc -p tsconfig.node.json",
-    "lint": "eslint .",
     "test": "vitest run",
-    "verify": "npm run typecheck && npm run lint && npm test",
+    "lint": "eslint .",
+    "build": "node scripts/fetch-panel.mjs",
     "deploy": "wrangler deploy"
-  },
-  "dependencies": {
-    "@cloudflare/containers": "0.3.7",
-    "yaml": "2.8.1"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
@@ -50,12 +24,15 @@
   },
   "cloudflare": {
     "bindings": {
-      "DASHBOARD_PASSWORD": {
-        "description": "Password for the dashboard sign-in at /login. Use a long random string, for example `openssl rand -base64 30`."
-      },
       "MANAGEMENT_KEY": {
-        "description": "CPA management key, asked for inside the dashboard. At least 32 characters of A-Z a-z 0-9 _ -, for example `openssl rand -hex 32`. Used on first start only; change it in the dashboard afterwards."
+        "description": "The existing CLIProxyAPI management key, at least 16 characters."
+      },
+      "ANTIGRAVITY_CLIENT_SECRET": {
+        "description": "The upstream desktop OAuth client secret, supplied privately."
       }
     }
+  },
+  "dependencies": {
+    "yaml": "2.8.1"
   }
 }

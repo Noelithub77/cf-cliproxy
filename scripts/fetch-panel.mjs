@@ -5,7 +5,7 @@ import { Buffer } from "node:buffer";
 import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 
-const version = process.env.PANEL_VERSION || "latest";
+const version = process.env.PANEL_VERSION || "v1.27.0";
 const expected = (process.env.PANEL_SHA256 ?? "").trim().toLowerCase();
 const base = "https://github.com/router-for-me/Cli-Proxy-API-Management-Center/releases";
 const url = version === "latest" ? `${base}/latest/download/management.html` : `${base}/download/${version}/management.html`;

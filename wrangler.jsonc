@@ -1,23 +1,16 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "sub2api",
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "infer-cf",
+  "account_id": "75bb6d35925d6493575a3e2d6deac186",
   "main": "src/index.ts",
   "compatibility_date": "2026-10-01",
-  "workers_dev": true,
-  "observability": { "enabled": true },
-  "containers": [
-    {
-      "class_name": "Cpa",
-      "image": "./container/Dockerfile",
-      "image_build_context": "./container",
-      "instance_type": "basic",
-      "max_instances": 1
-    }
-  ],
-  "durable_objects": {
-    "bindings": [{ "name": "CPA", "class_name": "Cpa" }]
-  },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Cpa"] }],
-  "r2_buckets": [{ "binding": "STATE", "bucket_name": "sub2api" }],
-  "ratelimits": [{ "name": "LOGIN_LIMIT", "namespace_id": "1001", "simple": { "limit": 5, "period": 60 } }]
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "infer-cf.allpyq.in", "custom_domain": true }],
+  "observability": { "enabled": true, "head_sampling_rate": 0.01 },
+  "limits": { "cpu_ms": 10 },
+  "build": { "command": "node scripts/fetch-panel.mjs" },
+  "assets": { "directory": "public", "binding": "ASSETS", "run_worker_first": true, "html_handling": "none" },
+  "durable_objects": { "bindings": [{ "name": "STORE", "class_name": "Store" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Store"] }]
 }

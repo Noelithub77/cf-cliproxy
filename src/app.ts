@@ -1,3 +1,4 @@
+import { antigravityResponse, structuredOutput } from "./antigravity-proxy.ts";
 import { hashKey, REFRESH_MARGIN_SECONDS, type Backend, type ServedLogin } from "./account.ts";
 import type { Fetcher } from "./claude-oauth.ts";
 import { claudeToGemini, geminiClaudeMessage, GeminiClaudeStream } from "./claude-gemini.ts";
@@ -334,6 +335,7 @@ async function viaClaudeMessages(request: Request, url: URL, route: Route & { fo
       : route.format === "gemini"
       ? { ...geminiToClaude(client, candidate.model, route.geminiAction === "streamGenerateContent"), customTools: new Set<string>() }
       : { ...chatToClaude(client, candidate.model), customTools: new Set<string>() };
+  if (candidate.credential.kind === "antigravity" && route.format === "openai") structuredOutput(client, translated.body);
   let upstream: Response | null;
   if (NATIVE_FORMAT[candidate.credential.kind] === "claude") {
     // The client's own headers describe an OpenAI request, so none of them go upstream.
@@ -405,8 +407,8 @@ function anyLogin(provider: LoginEntry["provider"]): LoginEntry {
 
 function loginsOf(table: RoutingTable): readonly LoginEntry[] {
   if (table.logins !== undefined) return table.logins;
-  const any = [table.claudeOAuth, table.codexOAuth, table.kimiOAuth === true, table.vertexOAuth === true];
-  return (["claude", "codex", "kimi", "vertex"] as const).filter((_, index) => any[index]).map(anyLogin);
+  const any = [table.claudeOAuth, table.codexOAuth, table.kimiOAuth === true, table.vertexOAuth === true, table.antigravityOAuth === true];
+  return (["claude", "codex", "kimi", "vertex", "antigravity"] as const).filter((_, index) => any[index]).map(anyLogin);
 }
 
 // Kimi and Vertex logins are served like an API key of their provider, once their endpoint and
@@ -422,7 +424,7 @@ function servedCandidate(login: LoginEntry, model: string): Candidate {
 function servedOf(candidate: Candidate): { provider: ServedLogin; name: string } | null {
   if (candidate.credential.group !== SERVED_GROUP) return null;
   const provider = candidate.credential.kind;
-  if (provider !== "kimi" && provider !== "vertex") return null;
+  if (provider !== "kimi" && provider !== "vertex" && provider !== "antigravity") return null;
   return { provider, name: candidate.credential.id.slice("file:".length) };
 }
 
@@ -511,7 +513,7 @@ async function proxied(request: Request, url: URL, route: Route & { format: Form
   const logins = loginsOf(table);
   const claudeLogins = logins.filter((login) => login.provider === "claude");
   const codexLogins = logins.filter((login) => login.provider === "codex");
-  const servedLogins = logins.filter((login) => login.provider === "kimi" || login.provider === "vertex");
+  const servedLogins = logins.filter((login) => login.provider === "kimi" || login.provider === "vertex" || login.provider === "antigravity");
   // Claude clients with one Claude login and nothing else: stream the body through unread.
   if (route.format === "claude" && claudeLogins.length === 1 && codexLogins.length === 0 && servedLogins.length === 0 && table.credentials.length === 0) {
     const only = loginCandidate(claudeLogins[0] as LoginEntry, "");
@@ -540,7 +542,7 @@ async function proxied(request: Request, url: URL, route: Route & { format: Form
   // "prefix/model" picks the logins with that prefix; other names may use any login.
   const { prefix, model: bare } = splitModel(table, model);
   const loginsFor = (provider: LoginEntry["provider"], upstreamModel = bare) =>
-    logins.filter((login) => login.provider === provider && (prefix === "" || login.prefix === prefix)).map((login) => (provider === "kimi" || provider === "vertex" ? servedCandidate(login, upstreamModel) : loginCandidate(login, upstreamModel)));
+    logins.filter((login) => login.provider === provider && (prefix === "" || login.prefix === prefix)).map((login) => (provider === "kimi" || provider === "vertex" || provider === "antigravity" ? servedCandidate(login, upstreamModel) : loginCandidate(login, upstreamModel)));
   if (route.format === "claude" && /^claude-/i.test(bare)) usable.push(...loginsFor("claude"));
   // ChatGPT logins take Codex's own models, and any Responses model nothing else serves.
   if (route.format === "openai-response" && (inDefaultFamily("codex", bare) || usable.length === 0)) usable.push(...loginsFor("codex"));
@@ -548,6 +550,7 @@ async function proxied(request: Request, url: URL, route: Route & { format: Form
   if ((route.format === "claude" || route.format === "openai") && inDefaultFamily("codex", bare)) usable.push(...loginsFor("codex"));
   // Vertex service accounts take Gemini models, from any client, translated where needed.
   if (route.format !== "interactions" && inDefaultFamily("vertex", bare)) usable.push(...loginsFor("vertex"));
+  if (route.format !== "interactions" && inDefaultFamily("antigravity", bare)) usable.push(...loginsFor("antigravity"));
   // Kimi logins take Kimi's models in Anthropic and both OpenAI formats untranslated, and
   // Gemini clients through Anthropic Messages.
   if (route.format !== "interactions" && inDefaultFamily("kimi", bare)) usable.push(...loginsFor("kimi", kimiUpstreamModel(bare)));
@@ -566,6 +569,10 @@ async function proxied(request: Request, url: URL, route: Route & { format: Form
   }
   // One attempt with one candidate, through the path its provider and the request format need.
   const serveWith = async (attempt: Candidate, attemptConfig: AppConfig): Promise<Response> => {
+    if (attempt.credential.kind === "antigravity") {
+      const original = attemptConfig.upstream;
+      attemptConfig = { ...attemptConfig, upstream: async (request) => antigravityResponse(await original(request)) };
+    }
     let candidate = attempt;
     let servedToken = "";
     const served = servedOf(attempt);
@@ -797,6 +804,10 @@ function socketHeaders(source: Headers): Headers {
   return headers;
 }
 
+async function dashboardAccess(request: Request, config: AppConfig): Promise<boolean> {
+  return config.dashboardPassword === "" || signedIn(request, config);
+}
+
 async function signedIn(request: Request, config: AppConfig): Promise<boolean> {
   if (config.dashboardPassword.length < MIN_PASSWORD_LENGTH) return false;
   const token = readCookie(request.headers.get("cookie"), SESSION_COOKIE);
@@ -859,7 +870,7 @@ async function managementKeyValid(request: Request, config: AppConfig): Promise<
 }
 
 async function management(request: Request, url: URL, config: AppConfig): Promise<Response> {
-  if (!(await signedIn(request, config))) return Response.json({ error: "sign in at /login first" }, { status: 401 });
+  if (!(await dashboardAccess(request, config))) return Response.json({ error: "sign in at /login first" }, { status: 401 });
   if (!managementEnabled(config)) return Response.json({ error: MANAGEMENT_KEY_NOT_SET }, { status: 503 });
   if (!(await managementKeyValid(request, config))) return Response.json({ error: "invalid management key" }, { status: 401 });
   // The dashboard checks a server with v0's config read before switching to v8.
@@ -872,7 +883,7 @@ async function management(request: Request, url: URL, config: AppConfig): Promis
 
 async function oauthCallback(request: Request, url: URL, config: AppConfig): Promise<Response> {
   if (request.method !== "GET") return notFound();
-  if (!(await signedIn(request, config))) {
+  if (!(await dashboardAccess(request, config))) {
     return html(messagePage("Sign in first", "Sign in to the dashboard, then open this address again.", true), 401);
   }
   const target = new URL(`${MANAGEMENT_PREFIX}/oauth/callback${url.search}`, url);
@@ -908,10 +919,10 @@ export async function handle(request: Request, config: AppConfig): Promise<Respo
       return redirect("/login", { "set-cookie": `${SESSION_COOKIE}=; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0` });
     case "/":
       if (request.method !== "GET") return notFound();
-      return redirect((await signedIn(request, config)) ? "/management.html" : "/login");
+      return redirect((await dashboardAccess(request, config)) ? "/management.html" : "/login");
     case "/management.html":
       if (request.method !== "GET") return notFound();
-      return (await signedIn(request, config)) ? panel(request, config) : redirect("/login");
+      return (await dashboardAccess(request, config)) ? panel(request, config) : redirect("/login");
     default:
       return notFound();
   }

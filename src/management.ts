@@ -1,3 +1,4 @@
+import { MODELS as ANTIGRAVITY_MODELS } from "./antigravity-proxy.ts";
 import { LOGIN_PROVIDERS, type Account, type OAuthProvider } from "./account.ts";
 import { OAuthError } from "./claude-oauth.ts";
 import { Config, ConfigError, configTag, ifMatchSatisfied } from "./config.ts";
@@ -14,7 +15,7 @@ import { serviceAccountOf, signingKey, validLocation, vertexFileData, vertexFile
 export const MANAGEMENT_PREFIX = "/v8/management";
 export const GATEWAY_VERSION = "sub2api";
 // CPA's provider names and their aliases.
-const OAUTH_ALIASES: Record<string, OAuthProvider> = { claude: "claude", anthropic: "claude", codex: "codex", openai: "codex", kimi: "kimi", "kimi-ai": "kimi" };
+const OAUTH_ALIASES: Record<string, OAuthProvider> = { claude: "claude", anthropic: "claude", codex: "codex", openai: "codex", kimi: "kimi", "kimi-ai": "kimi", antigravity: "antigravity" };
 
 function json(body: unknown, status = 200, headers: Record<string, string> = {}): Response {
   return Response.json(body, { status, headers: { "cache-control": "no-store", ...headers } });
@@ -302,6 +303,7 @@ async function catalogOf(account: Account): Promise<Catalog> {
 // The models a login serves, as CPA lists them for its auth file: none while it is disabled.
 async function loginModels(file: CredentialFile, account: Account): Promise<Record<string, unknown>[]> {
   if (file.disabled) return [];
+  if (file.provider === "antigravity") return ANTIGRAVITY_MODELS.map((id) => fileModel({ id, owned_by: "google", type: "gemini" }));
   if (file.provider === "claude") return (await catalogOf(account)).claude.map(fileModel);
   if (file.provider === "codex") return (await catalogOf(account))[codexChannel(typeof file.data.plan_type === "string" ? file.data.plan_type : "")].map(fileModel);
   return [];

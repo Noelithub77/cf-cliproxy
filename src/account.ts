@@ -1,5 +1,6 @@
 import { OAuthError, authorizeUrl, exchangeCode, parseCallback, randomToken, refresh, type Fetcher } from "./claude-oauth.ts";
 import * as codex from "./codex-oauth.ts";
+import * as antigravity from "./antigravity-auth.ts";
 import { Config } from "./config.ts";
 import { CatalogCache } from "./models.ts";
 import { flagOf, retryOf, upstreamCredentials, weightOf, type LoginEntry, type RoutingTable, type UpstreamCredential } from "./providers.ts";
@@ -18,12 +19,12 @@ export type TokenResult =
 
 // The logins the gateway keeps fresh: subscriptions signed in to from the dashboard, and Vertex
 // service accounts imported there.
-export type LoginProvider = "claude" | "codex" | "kimi" | "vertex";
+export type LoginProvider = "claude" | "codex" | "kimi" | "vertex" | "antigravity";
 export type OAuthProvider = Exclude<LoginProvider, "vertex">;
 // Logins the Worker serves like an API key of their provider, with a token and an endpoint.
-export type ServedLogin = "kimi" | "vertex";
-export const LOGIN_PROVIDERS: readonly LoginProvider[] = ["claude", "codex", "kimi", "vertex"];
-const LABEL: Record<LoginProvider, string> = { claude: "Claude", codex: "ChatGPT (Codex)", kimi: "Kimi", vertex: "Vertex AI" };
+export type ServedLogin = "kimi" | "vertex" | "antigravity";
+export const LOGIN_PROVIDERS: readonly LoginProvider[] = ["claude", "codex", "kimi", "vertex", "antigravity"];
+const LABEL: Record<LoginProvider, string> = { claude: "Claude", codex: "ChatGPT (Codex)", kimi: "Kimi", vertex: "Vertex AI", antigravity: "Antigravity" };
 // CPA names Kimi.ai logins "kimi-ai"; they are Kimi logins on the other domain.
 const PROVIDER_OF_FILE: Record<string, LoginProvider> = { "kimi-ai": "kimi" };
 
@@ -89,6 +90,10 @@ function loginEntry(file: CredentialFile, provider: LoginEntry["provider"]): Log
 
 function loginOf(file: CredentialFile): Login | null {
   if (file.provider === "codex") return codex.codexCredential(file.data);
+  if (file.provider === "antigravity") {
+    const login = antigravity.loginOf(file.data);
+    return login === null ? null : { ...login, accountId: "", endpoint: antigravity.API_BASE, headers: { "x-antigravity-project": login.projectId } };
+  }
   if (file.provider === "kimi" || file.provider === "kimi-ai") {
     const login = kimi.kimiLogin(file.data);
     return login === null ? null : { accessToken: login.accessToken, refreshToken: login.refreshToken, expiresAt: login.expiresAt, accountId: "", endpoint: kimi.apiBase(login.domain), headers: kimi.identityHeaders(login.deviceId) };
@@ -122,6 +127,7 @@ export class Account {
     readonly vault: Vault,
     readonly fetcher: Fetcher,
     readonly nowSeconds: () => number,
+    readonly antigravityOptions: antigravity.AntigravityOptions = { clientSecret: "" },
   ) {}
 
   currentConfig(): Config {
@@ -154,6 +160,7 @@ export class Account {
       codexPlans,
       vertexOAuth: logins.some((login) => login.provider === "vertex"),
       kimiOAuth: logins.some((login) => login.provider === "kimi"),
+      antigravityOAuth: logins.some((login) => login.provider === "antigravity"),
       logins,
       settings: this.settings,
       cooldowns: this.vault.cooldowns(this.nowSeconds()),
@@ -269,7 +276,7 @@ export class Account {
     }
     const verifier = randomToken(96);
     this.vault.saveSession({ state, provider, verifier, createdAt: this.nowSeconds(), status: "wait", error: "" }, this.nowSeconds());
-    return { url: provider === "codex" ? await codex.authorizeUrl(state, verifier) : await authorizeUrl(state, verifier), state };
+    return { url: provider === "antigravity" ? antigravity.authorizeUrl(state) : provider === "codex" ? await codex.authorizeUrl(state, verifier) : await authorizeUrl(state, verifier), state };
   }
 
   session(state: string): LoginSession | null {
@@ -318,7 +325,10 @@ export class Account {
     }
     try {
       const bareCode = code.split("#")[0] ?? code;
-      if (session.provider === "codex") {
+      if (session.provider === "antigravity") {
+        const login = await antigravity.exchangeCode(this.fetcher, bareCode, this.antigravityOptions, this.nowSeconds());
+        this.vault.saveCredentialFile(`antigravity-${login.email || randomToken(6)}.json`, "antigravity", antigravity.fileData(login), this.nowSeconds());
+      } else if (session.provider === "codex") {
         const credential = await codex.exchangeCode(this.fetcher, bareCode, session.verifier, this.nowSeconds());
         this.vault.saveCredentialFile(await codex.codexFileName(credential), "codex", codex.codexFileData(credential), this.nowSeconds());
       } else {
@@ -353,6 +363,12 @@ export class Account {
         const refreshed = await kimi.refresh(this.fetcher, login.domain, login.deviceId, login.refreshToken, this.nowSeconds());
         this.vault.saveCredentialFile(file.name, file.provider, { ...file.data, ...kimi.kimiFileData(refreshed, login.domain, login.deviceId), type: file.provider }, this.nowSeconds());
         next = { ...current, accessToken: refreshed.accessToken, refreshToken: refreshed.refreshToken, expiresAt: refreshed.expiresAt };
+      } else if (file.provider === "antigravity") {
+        const login = antigravity.loginOf(file.data);
+        if (login === null) throw new OAuthError("The Antigravity file has no tokens", 400);
+        const refreshed = await antigravity.refresh(this.fetcher, login, this.antigravityOptions, this.nowSeconds());
+        this.vault.saveCredentialFile(file.name, file.provider, { ...file.data, ...antigravity.fileData(refreshed) }, this.nowSeconds());
+        next = { ...current, ...refreshed, headers: { "x-antigravity-project": refreshed.projectId } };
       } else if (file.provider === "vertex") {
         const login = vertexLogin(file.data);
         if (login === null) throw new OAuthError("the file has no usable service account", 400);

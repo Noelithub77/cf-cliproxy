@@ -2,18 +2,20 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "types": [
-      "node"
+      "node",
+      "./worker-configuration.d.ts"
     ]
   },
   "include": [
-    "test/s3-server.ts",
-    "worker/test/sqlite.ts",
-    "worker/test/account.test.ts",
-    "worker/test/management.test.ts",
-    "worker/test/codex.test.ts",
-    "worker/test/usage.test.ts",
-    "worker/test/vertex.test.ts",
-    "worker/test/kimi.test.ts"
+    "test/sqlite.ts",
+    "test/account.test.ts",
+    "test/management.test.ts",
+    "test/codex.test.ts",
+    "test/usage.test.ts",
+    "test/vertex.test.ts",
+    "test/kimi.test.ts",
+    "test/antigravity.test.ts",
+    "scripts/ops.ts"
   ],
   "exclude": []
 }

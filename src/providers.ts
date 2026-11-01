@@ -5,7 +5,7 @@ import type { Cooldown, RoutingSettings } from "./routing.ts";
 // and a list of keys; a key may override the group's settings, as in CPA.
 
 // "kimi" is a Kimi login served like a key; CPA's config has no Kimi keys, so it isn't read there.
-export type ProviderKind = "claude" | "gemini" | "interactions" | "vertex" | "codex" | "xai" | "kimi" | "openai-compatibility";
+export type ProviderKind = "claude" | "gemini" | "interactions" | "vertex" | "codex" | "xai" | "kimi" | "antigravity" | "openai-compatibility";
 // The request shapes clients send: Anthropic Messages, OpenAI Chat Completions, OpenAI
 // Responses, Gemini generateContent, and Gemini's Interactions API.
 export type Format = "claude" | "openai" | "openai-response" | "gemini" | "interactions";
@@ -20,6 +20,7 @@ export const NATIVE_FORMAT: Record<ProviderKind, Format> = {
   codex: "openai-response",
   xai: "openai-response",
   kimi: "claude",
+  antigravity: "gemini",
   "openai-compatibility": "openai",
 };
 
@@ -39,6 +40,7 @@ export const DEFAULT_BASE_URL: Record<ProviderKind, string> = {
   codex: "https://chatgpt.com/backend-api/codex",
   xai: "https://api.x.ai/v1",
   kimi: "https://api.kimi.com/coding",
+  antigravity: "https://daily-cloudcode-pa.googleapis.com",
   "openai-compatibility": "",
 };
 
@@ -51,6 +53,7 @@ const DEFAULT_FAMILY: Record<ProviderKind, RegExp | null> = {
   codex: /^(gpt-|codex-|o\d)/i,
   xai: /^grok-/i,
   kimi: /^kimi-/i,
+  antigravity: /^gemini-/i,
   "openai-compatibility": null,
 };
 
@@ -81,7 +84,7 @@ export interface UpstreamCredential {
 // One enabled subscription login, with the routing fields CPA reads from its auth file.
 export interface LoginEntry {
   readonly name: string;
-  readonly provider: "claude" | "codex" | "kimi" | "vertex";
+  readonly provider: "claude" | "codex" | "kimi" | "vertex" | "antigravity";
   readonly priority: number;
   readonly weight: number;
   readonly prefix: string;
@@ -107,6 +110,7 @@ export interface RoutingTable {
   readonly vertexOAuth?: boolean;
   // Whether at least one Kimi login is enabled.
   readonly kimiOAuth?: boolean;
+  readonly antigravityOAuth?: boolean;
 }
 
 export interface Candidate {

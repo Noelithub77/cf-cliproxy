@@ -1,9 +1,8 @@
-import type { Cpa } from "./cpa.ts";
+import type { Store } from "./store.ts";
 
 export interface Env {
-  readonly CPA: DurableObjectNamespace<Cpa>;
-  readonly STATE: R2Bucket;
-  readonly LOGIN_LIMIT: RateLimit;
+  readonly STORE: DurableObjectNamespace<Store>;
+  readonly ASSETS: Fetcher;
   readonly MANAGEMENT_KEY?: string;
-  readonly DASHBOARD_PASSWORD?: string;
+  readonly ANTIGRAVITY_CLIENT_SECRET?: string;
 }

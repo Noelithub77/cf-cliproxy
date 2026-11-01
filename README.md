@@ -1,141 +1,43 @@
-# sub2api: a Cloudflare-based LLM gateway and proxy server
+# cf-cliproxy
 
-[![ci](https://github.com/PlaygrndLabs/sub2api/actions/workflows/ci.yml/badge.svg)](https://github.com/PlaygrndLabs/sub2api/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+cliproxy running full time free on cf
 
-**Literally the [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) (CPA) project, deployed as a Cloudflare Worker in one click.** Turn your Claude, ChatGPT Codex, Gemini and Kimi subscriptions into your own private API. Point Claude Code, the Anthropic or OpenAI SDKs, or any app at your gateway URL and use your subscription from anywhere, with no server or home machine left running.
+A Workers-only fork of [PlaygrndLabs/sub2api](https://github.com/PlaygrndLabs/sub2api), with Antigravity Gemini support adapted from [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI). It serves the official CLIProxyAPI management client at `/management.html` and OpenAI-compatible inference at `/v1`.
 
-Two ways to install. Both are free and open source, with the same dashboard; sub2api never charges you anything. Pick by the Cloudflare plan you already have:
+The endpoint is available on demand around the clock. It does not keep a server running while idle, and free-tier quotas apply. No container, paid Workers plan upgrade, R2 bucket, or D1 database is required.
 
-| Install | Your Cloudflare plan | What runs | Deploy |
-|---|---|---|---|
-| **Workers&#8209;only** | Workers Free | Our TypeScript port of CPA:<br>any app to any provider | <a href="https://deploy.workers.cloudflare.com/?url=https://github.com/PlaygrndLabs/sub2api/tree/main/worker"><img src="https://deploy.workers.cloudflare.com/button" alt="Deploy to Cloudflare" width="170"></a> |
-| **Container** | Workers Paid<br>($5/month, for Containers) | The latest CPA release<br>in a container | <a href="https://deploy.workers.cloudflare.com/?url=https://github.com/PlaygrndLabs/sub2api"><img src="https://deploy.workers.cloudflare.com/button" alt="Deploy to Cloudflare" width="170"></a> |
+## State and access
 
-## Why
+One SQLite-backed Durable Object stores configuration, inference keys, provider auth files, OAuth sessions, refreshed tokens, cooldowns, and bounded usage records. Worker restarts and ordinary deployments preserve this state. The object also coalesces concurrent token refreshes. Deleting its namespace or changing its identity loses access to that saved state; preserve the `Store` class, migration history and `main` object name.
 
-- **One click, no server.** Cloudflare builds and runs everything. Nothing to keep online.
-- **The real CPA.** Built from the latest upstream release with its official dashboard, rebuilt weekly, so every provider and API CPA supports just works: Anthropic Messages, OpenAI-compatible and Gemini.
-- **Private by default.** The dashboard sits behind a password, and every API call needs a key you create. Until then, all calls are refused.
-- **Logins that stick.** Config and OAuth logins live in your own R2 bucket and survive restarts and redeploys.
-- **Costs little when idle.** The container sleeps after 30 minutes and wakes on the next request.
+`MANAGEMENT_KEY` is a Worker secret. The official manager prompts for it, and every management API request must present it. There is no additional dashboard password. The HTML application is public, while configuration and provider credentials require the management key. Inference uses a separate API key stored in the protected configuration. Keep both credentials out of Git, command arguments and logs.
 
-## Quick start
+## Antigravity
 
-You need a Cloudflare account on the [Workers Paid plan](https://developers.cloudflare.com/workers/platform/pricing/) ($5/month; Containers require it).
+Import a CLIProxyAPI Antigravity JSON auth file through **Auth files**, or use **OAuth login → Antigravity**. The login follows Google's registered localhost callback; paste the complete callback address into the manager. Google account/project onboarding must already be complete, or import an existing working auth file.
 
-On Workers Free? Use the **Workers-only** button above instead; see [worker/README.md](worker/README.md).
+The Worker refreshes Google access tokens in the Durable Object, retains the refresh token when Google does not replace it, and stores the provider project ID. Inference uses the Antigravity Cloud Code `v1internal` envelope, with streamed responses unwrapped incrementally. Gemini text, inline images, tools, thinking configuration, and OpenAI JSON output schemas pass through the existing protocol translators.
 
-1. Press the **Container** install's **Deploy to Cloudflare** button above.
-2. Set the two secrets it asks for. Each needs at least 32 characters of `A-Z a-z 0-9 _ -`; `openssl rand -hex 32` makes one:
-   - `DASHBOARD_PASSWORD`: your dashboard sign-in password.
-   - `MANAGEMENT_KEY`: CPA's management key, asked for after sign-in.
-3. Open `https://sub2api.<your-subdomain>.workers.dev`, sign in, and create an API key under **API Keys**.
+The advertised Antigravity models are `gemini-3.5-flash-lite` and `gemini-3.8-flash-high`. Claude models through Antigravity are not advertised: their signature replay path has not been ported or verified. Existing Claude, ChatGPT/Codex and Kimi OAuth and API-key providers remain available. Workers Free has a 10 ms CPU limit, so large translated conversations/PDF image payloads may exceed the budget. This independent endpoint does not change AllPYQ's Azure primary or laptop backup.
 
-## Connect a subscription
+The reference implementation is CLIProxyAPI's `internal/auth/antigravity/`, `internal/runtime/executor/antigravity_executor_request.go`, and Gemini/OpenAI translators. The OAuth desktop client secret is supplied as `ANTIGRAVITY_CLIENT_SECRET`, outside source. Provider error bodies from token exchanges are not logged or returned.
 
-1. In the dashboard, open **OAuth login** and pick a provider (for Claude: Anthropic).
-2. Sign in with the provider. You land on a `localhost` page that doesn't load; that's expected.
-3. Copy that address into the dashboard's **Callback URL** field. Or replace `http://localhost:<port>` with your gateway URL and open it in the same browser.
+## Operations
 
-CPA stores the login and refreshes its tokens on its own.
+Install the pinned dependencies with `npm ci --ignore-scripts`. Existing checks are `npm run typecheck`, `npm run lint`, and `npm test`. Discover the tracked operator with `pnpm ops help` (or `npm run ops -- help`). It uses the existing cf CLI OAuth session or `CLOUDFLARE_API_TOKEN` without printing the token.
 
-## Use it
-
-Claude Code, the Claude Agent SDK and the Anthropic SDKs:
-
-```bash
-export ANTHROPIC_BASE_URL=https://sub2api.<your-subdomain>.workers.dev
-export ANTHROPIC_API_KEY=<your gateway API key>
+```sh
+pnpm ops doctor --prod
+pnpm ops deploy --prod
+pnpm ops deploy --prod --apply
+pnpm ops secrets --prod < /private/setup.json
+pnpm ops secrets --prod --apply < /private/setup.json
+pnpm ops configure --prod < /private/setup.json
+pnpm ops configure --prod --apply < /private/setup.json
+pnpm ops status --prod < /private/setup.json
+pnpm ops probe --prod < /private/setup.json
 ```
 
-OpenAI-compatible clients (Codex CLI, OpenAI SDKs, Cursor, and others):
+The protected JSON file contains `secrets` (`MANAGEMENT_KEY`, `ANTIGRAVITY_CLIENT_SECRET`), `apiKey`, `managementKey`, and optional `authFiles` entries with `name` and parsed `data`. It must be mode 0600 and remain outside the repository. Configuration imports replace this gateway's inference-key list with the selected shared key and upload only the listed auth files. `status` emits hashes/counts/model names, not credentials. A probe sends one fixed small inference request; optional `imageDataUrl` must show the fixture digits 47.
 
-```bash
-export OPENAI_BASE_URL=https://sub2api.<your-subdomain>.workers.dev/v1
-export OPENAI_API_KEY=<your gateway API key>
-```
-
-Gemini clients use `<gateway>/v1beta` with the same key.
-
-```bash
-curl https://sub2api.<your-subdomain>.workers.dev/v1/messages \
-  -H "x-api-key: $ANTHROPIC_API_KEY" -H "anthropic-version: 2023-06-01" -H "content-type: application/json" \
-  -d '{"model":"claude-sonnet-5-5","max_tokens":64,"messages":[{"role":"user","content":"Say hi"}]}'
-```
-
-On the Workers-only install the host is `sub2api.<your-subdomain>.workers.dev`. `GET /v1/models` lists what your subscriptions offer. Give each app its own key, so you can revoke one without touching the rest.
-
-## How it works
-
-```
-app ──► Worker ──► Durable Object ──► Container: CPA ──► Claude / Codex / Gemini
-                   · API key check        │
-                   · dashboard sign-in    └─► http://r2.internal ──► R2 bucket
-```
-
-The Worker hands every request to one Durable Object in front of the CPA container. The Durable Object refuses API calls until a key exists and keeps the dashboard behind a password. CPA's S3 storage is served from an R2 binding, so you never create storage keys. See [SECURITY.md](SECURITY.md) for the full model.
-
-The **Workers-only** install has no container. The Worker runs our TypeScript port of CPA itself, and one Durable Object keeps logins, config, usage and logs:
-
-```
-app ──► Worker: CPA port ──► Claude / Codex / Gemini / Vertex / Kimi / xAI / OpenAI-compatible
-        · API key check         · any app format to any provider
-        · dashboard sign-in     · routing, failover, cooldowns
-          │
-          └─► Durable Object (SQLite): logins, config, usage, logs
-```
-
-See [worker/README.md](worker/README.md) for what it covers.
-
-## Update
-
-A Deploy-button copy redeploys whenever its `main` branch changes. To get the latest release:
-
-```bash
-git pull https://github.com/PlaygrndLabs/sub2api main
-git push
-```
-
-If git refuses because the histories are unrelated, add `--allow-unrelated-histories` to the pull once. Logins and config live in R2, so updates keep them.
-
-<details>
-<summary><b>Deploy with wrangler or GitHub Actions</b></summary>
-
-```bash
-npm ci
-npx wrangler login
-npx wrangler r2 bucket create sub2api
-npx wrangler deploy        # needs Docker to build the image
-sh scripts/set-secrets.sh  # generates both secrets, stores them, prints them once
-```
-
-To deploy from GitHub Actions, add the repository secrets `CLOUDFLARE_API_TOKEN` (Workers Scripts, Containers, Workers R2 Storage: Edit) and `CLOUDFLARE_ACCOUNT_ID`, and set the repository variable `DEPLOY_CONTAINER` to `true`. Every green `ci` run on `main` then deploys, and a weekly run picks up the newest CPA release.
-
-`MANAGEMENT_KEY` seeds CPA's config on first start only; after that, change it in the dashboard. `DASHBOARD_PASSWORD` can be changed any time with `wrangler secret put DASHBOARD_PASSWORD`.
-</details>
-
-<details>
-<summary><b>Develop</b></summary>
-
-```bash
-npm ci
-npm run verify              # typecheck, lint, unit tests
-sh test/container-smoke.sh  # needs Docker: runs CPA against the R2 shim
-```
-
-The container builds the newest CPA release and dashboard by default. To freeze them, set `CPA_VERSION`, `PANEL_VERSION` and `PANEL_SHA256` in `container/Dockerfile`.
-</details>
-
-## Good to know
-
-- Requests reach providers from Cloudflare's network. **Check that your provider's terms allow how you use your subscription.**
-- The first request after the container sleeps takes a few seconds while it starts.
-- Cost is the $5 Workers Paid plan plus container time while awake. See [Containers pricing](https://developers.cloudflare.com/containers/pricing/).
-- Lost the management key? Set a new `MANAGEMENT_KEY` secret, delete `config/config.yaml` from the `sub2api` R2 bucket, and redeploy. CPA starts with a fresh config. Provider logins stay, but you recreate your app API keys.
-
-Built on [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI). Not affiliated with Anthropic, OpenAI, Google or Cloudflare.
-
-## License
-
-[MIT](LICENSE)
+The tracked production configuration targets `infer-cf.allpyq.in` on Noel's account. Change those target identifiers before deploying a different installation. Deployment previews bundle locally without changing Cloudflare. Deployment uses a pinned official management-client release and prints its SHA-256. Read `plan/infer-cf/receipt.json` for actual deployment and test evidence, when present. GitHub Actions checks every push; deployment is manual and requires repository credentials.

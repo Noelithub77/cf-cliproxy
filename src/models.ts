@@ -1,4 +1,5 @@
 import type { Fetcher } from "./claude-oauth.ts";
+import { MODELS as ANTIGRAVITY_MODELS } from "./antigravity-proxy.ts";
 import { EMBEDDED_CATALOG } from "./model-catalog.ts";
 import { excluded, type ProviderKind, type RoutingTable, type UpstreamCredential } from "./providers.ts";
 
@@ -204,6 +205,7 @@ const OWNER: Record<ProviderKind, { owned_by: string; type: string; channel: Cha
   xai: { owned_by: "xai", type: "xai", channel: "xai" },
   vertex: { owned_by: "google", type: "gemini", channel: "vertex" },
   kimi: { owned_by: "moonshot", type: "kimi", channel: "kimi" },
+  antigravity: { owned_by: "google", type: "gemini", channel: null },
   "openai-compatibility": { owned_by: "", type: "openai-compatibility", channel: null },
 };
 
@@ -248,8 +250,9 @@ export function servedModels(table: RoutingTable, catalog: Catalog, now: number)
     codex: table.codexOAuth ? plans.flatMap((plan) => catalog[codexChannel(plan)]) : [],
     vertex: table.vertexOAuth === true ? catalog.vertex : [],
     kimi: table.kimiOAuth === true ? catalog.kimi : [],
+    antigravity: table.antigravityOAuth === true ? ANTIGRAVITY_MODELS.map((id) => ({ id, owned_by: "google", type: "gemini" })) : [],
   };
-  for (const provider of ["claude", "codex", "vertex", "kimi"] as const) for (const model of loginModels[provider]) add(provider, model);
+  for (const provider of ["claude", "codex", "vertex", "kimi", "antigravity"] as const) for (const model of loginModels[provider]) add(provider, model);
   // A prefixed login's models are listed as "prefix/model" too, like a prefixed key's.
   for (const login of table.logins ?? []) {
     if (login.prefix !== "") for (const model of loginModels[login.provider]) add(login.provider, { ...model, id: `${login.prefix}/${model.id}` }, model.id);
