@@ -64,5 +64,30 @@
     "10 ms CPU budget and free-tier quotas apply; large PDF payloads not load tested",
     "Antigravity Gemini adapter only; Claude signature replay not ported",
     "Asset integrity and management API verified; browser management interaction not run"
-  ]
+  ],
+  "sharedCredentialReadback": {
+    "at": "2026-11-01T12:50:01.785Z",
+    "apiKeyHash": "c826785bd877",
+    "managementKeyHash": "88ddf056b102",
+    "endpoints": [
+      {
+        "endpoint": "https://infer.allpyq.in",
+        "inferenceAuthentication": 200,
+        "managementAuthentication": 200,
+        "anonymousInference": 401
+      },
+      {
+        "endpoint": "https://infer-local.allpyq.in",
+        "inferenceAuthentication": 200,
+        "managementAuthentication": 200,
+        "anonymousInference": 401
+      },
+      {
+        "endpoint": "https://infer-cf.allpyq.in",
+        "inferenceAuthentication": 200,
+        "managementAuthentication": 200,
+        "anonymousInference": 401
+      }
+    ]
+  }
 }
