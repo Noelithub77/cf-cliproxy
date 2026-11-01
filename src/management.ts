@@ -1,4 +1,5 @@
 import { MODELS as ANTIGRAVITY_MODELS } from "./antigravity-proxy.ts";
+import { managementRequest } from "./management-requests.ts";
 import { LOGIN_PROVIDERS, type Account, type OAuthProvider } from "./account.ts";
 import { OAuthError } from "./claude-oauth.ts";
 import { Config, ConfigError, configTag, ifMatchSatisfied } from "./config.ts";
@@ -434,6 +435,8 @@ export async function handleManagement(request: Request, account: Account): Prom
     if (head === "config") return configRoute(request, rest, false, account);
     if (head === "oauth" && rest.length === 1) return oauthRoute(request, url, rest[0] as string, account);
     switch (route) {
+      case "POST requests/api-call":
+        return managementRequest(request, account);
       case "GET credentials":
         return listCredentials(url, account);
       case "POST credentials":

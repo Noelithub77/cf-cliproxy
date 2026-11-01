@@ -47,7 +47,7 @@ async function api(path: string, init: RequestInit = {}): Promise<Response> {
   return response;
 }
 async function main(): Promise<unknown> {
-  if (command === "help") return { commands: ["doctor --prod", "deploy --prod [--apply]", "secrets --prod [--apply] < protected-input.json", "configure --prod [--apply] < protected-input.json", "status --prod < protected-input.json", "refresh --prod [--apply] < protected-input.json", "probe --prod < protected-input.json"], target: ORIGIN, note: "secrets/configure inputs are JSON on stdin only; previews never mutate. No plan upgrades or container resources." };
+  if (command === "help") return { commands: ["doctor --prod", "deploy --prod [--apply]", "secrets --prod [--apply] < protected-input.json", "configure --prod [--apply] < protected-input.json", "status --prod < protected-input.json", "refresh --prod [--apply] < protected-input.json", "probe --prod < protected-input.json", "quota --prod < protected-input.json"], target: ORIGIN, note: "secrets/configure inputs are JSON on stdin only; previews never mutate. No plan upgrades or container resources." };
   if (command === "doctor") {
     const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}/workers/scripts`, { headers: { authorization: `Bearer ${auth()}` } });
     if (!response.ok) throw new Error(`Cloudflare authentication failed (HTTP ${response.status})`);
@@ -102,6 +102,27 @@ async function main(): Promise<unknown> {
     const settings: unknown = await config.json();
     const keys = record(record(settings).access).apiKeys ?? record(record(settings).access)["api-keys"];
     return { publicModelsStatus: publicModels.status, models: Array.isArray(models) ? models.map((model: unknown) => text(record(model).id)) : [], managementStatus: config.status, configuredApiKeys: Array.isArray(keys) ? keys.length : null, apiKeyHash: hash(key), managementKeyHash: hash(management) };
+  }
+  if (command === "quota") {
+    const headers = { authorization: `Bearer ${management}`, "content-type": "application/json" };
+    const listed: unknown = await (await api("/v8/management/credentials", { headers })).json();
+    const files = record(listed).files;
+    if (!Array.isArray(files)) throw new Error("Invalid credential listing");
+    const accounts = [];
+    for (const item of files.slice(0, 20)) {
+      const file = record(item);
+      if (file.provider !== "antigravity" || file.disabled === true) continue;
+      const payload = { authIndex: text(file.auth_index), method: "POST", url: "https://daily-cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary", header: { Authorization: "Bearer $TOKEN$" }, data: JSON.stringify({ project: text(file.project_id) }) };
+      const value: unknown = await (await api("/v8/management/requests/api-call", { method: "POST", headers, body: JSON.stringify(payload) })).json();
+      const response = record(value);
+      if (response.status_code !== 200) throw new Error(`Google quota returned HTTP ${String(response.status_code)}`);
+      const raw: unknown = JSON.parse(text(response.body));
+      const groups = record(raw).groups;
+      if (!Array.isArray(groups) || !groups.length) throw new Error("Google quota response has no groups");
+      accounts.push({ provider: "antigravity", http: response.status_code, quotaGroups: groups.length });
+    }
+    if (!accounts.length) throw new Error("No Antigravity account is configured");
+    return { accounts };
   }
   if (command === "probe") {
     const model = typeof data.model === "string" ? data.model : "gemini-3.5-flash-lite";

@@ -16,6 +16,8 @@ One SQLite-backed Durable Object stores configuration, inference keys, provider 
 
 Import a CLIProxyAPI Antigravity JSON auth file through **Auth files**, or use **OAuth login → Antigravity**. The login follows Google's registered localhost callback; paste the complete callback address into the manager. Google account/project onboarding must already be complete, or import an existing working auth file.
 
+The official manager can read Antigravity quota groups and subscription tiers through its API-call contract. Token-bearing management requests are restricted to the fixed Google quota, model-list and project endpoints.
+
 The Worker refreshes Google access tokens in the Durable Object, retains the refresh token when Google does not replace it, and stores the provider project ID. Inference uses the Antigravity Cloud Code `v1internal` envelope, with streamed responses unwrapped incrementally. Gemini text, inline images, tools, thinking configuration, and OpenAI JSON output schemas pass through the existing protocol translators.
 
 The advertised Antigravity models are `gemini-3.5-flash-lite` and `gemini-3.8-flash-high`. Claude models through Antigravity are not advertised: their signature replay path has not been ported or verified. Existing Claude, ChatGPT/Codex and Kimi OAuth and API-key providers remain available. Workers Free has a 10 ms CPU limit, so large translated conversations/PDF image payloads may exceed the budget. This independent endpoint does not change AllPYQ's Azure primary or laptop backup.
@@ -38,6 +40,7 @@ pnpm ops status --prod < /private/setup.json
 pnpm ops refresh --prod < /private/setup.json
 pnpm ops refresh --prod --apply < /private/setup.json
 pnpm ops probe --prod < /private/setup.json
+pnpm ops quota --prod < /private/setup.json
 ```
 
 The protected JSON file contains `secrets` (`MANAGEMENT_KEY`, `ANTIGRAVITY_CLIENT_SECRET`), `apiKey`, `managementKey`, and optional `authFiles` entries with `name` and parsed `data`. It must be mode 0600 and remain outside the repository. Configuration imports replace this gateway's inference-key list with the selected shared key and upload only the listed auth files. `status` emits hashes/counts/model names, not credentials. A probe sends one fixed small inference request; optional `imageDataUrl` must show the fixture digits 47.
